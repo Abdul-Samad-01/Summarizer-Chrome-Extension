@@ -14,7 +14,7 @@ function App() {
 
 
   const configuration = new Configuration({
-    apiKey: "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",
+    apiKey: process.env.REACT_APP_OPENAI_API_KEY,
   });
 
   const openai = new OpenAIApi(configuration);
