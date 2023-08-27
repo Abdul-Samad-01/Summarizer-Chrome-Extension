@@ -4,32 +4,44 @@ import { useState } from "react";
 import { Configuration, OpenAIApi } from "openai";
 import copy from "./assets/copy-icon.png";
 import tick from "./assets/tick-icon.png";
+import LanguageDropdown from "./component/LanguageDropdown";
 
 function App() {
   const [text, setText] = useState();
+  const [primarytext, setPrimaryText] = useState();
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState('English'); // Default language
 
 
-
-
+  // Create OpenAI configuration
   const configuration = new Configuration({
     apiKey: process.env.REACT_APP_OPENAI_API_KEY,
   });
 
   const openai = new OpenAIApi(configuration);
 
+  // Copy text to clipboard and handle success
   const handleCopy = (text) => {
     setCopied(text);
-    navigator.clipboard.writeText(text);
+    const structuredText = text.replace(/<\/?strong>/g, '').replace(/<br\s?\/?>/g, '\n');
+
+    navigator.clipboard.writeText(structuredText);
     setTimeout(() => setCopied(false), 3000);
   };
 
+  // Handle language change
+  const handleLanguageChange = (newLanguage) => {
+    setSelectedLanguage(newLanguage);
+  };
+
+  // Get valid length text
   const getValidLengthText = (text) => {
     const validLength = 4 * 3200;
     return text.substr(0, validLength)
   }
 
+  // Get inner HTML of the active tab
   async function getCurrentTabHtml() {
     let queryOptions = { active: true, currentWindow: true };
     const tabs = await chrome.tabs.query(queryOptions);
@@ -47,6 +59,7 @@ function App() {
     return result;
   }
 
+  // Fetch summary from OpenAI API
   const fetchSummary = async () => {
     setLoading(true);
 
@@ -81,7 +94,7 @@ function App() {
       
       
       <strong>Detailed Summary</strong><br />
-      (Expand on key points with sub-points, examples, discussions, conclusions)<br />
+      (Expand on key points with sub-points, examples, discussions, conclusions and give summary within 150 words)<br />
       
       <strong>Conclusion</strong><br />
       (Any content conclusions, speaker's final thoughts)<br />
@@ -97,16 +110,39 @@ function App() {
       presence_penalty: 0.0,
     });
 
+    setText(response.data.choices[0].text);
+    setPrimaryText(response.data.choices[0].text);
+    setLoading(false);
+  };
+
+  // Translate text using OpenAI API
+  const translateText = async () => {
+    setLoading(true);
+
+    const response = await openai.createCompletion({
+      model: "text-davinci-003",
+      prompt: `Translate the following text from English to ${selectedLanguage}. Ensure that the translation maintains the meaning and context of the original text. Avoid overly literal translations and dont disturb the html tags leave as it is just translate remaining text without affecting the text structure. Feel free to paraphrase and use natural language to convey the essence of the content.\n\nOriginal Text:\n"${primarytext}":
+      "${primarytext}"`,
+      temperature: 0.7,
+      max_tokens: 400,
+      top_p: 1.0,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+    });
+
     setText(response.data.choices[0].text)
     setLoading(false);
   };
+
+
+
 
   return (
     <div className="container">
       <div className='gradient' />
       <h4 className='head_text'>
         Summarize Web Pages with <br />
-        <span  className='beautiful_gradient '>Artificial Intelligence</span>
+        <span className='beautiful_gradient '>Artificial Intelligence</span>
       </h4>
       <button
         className="summarizer-button"
@@ -122,17 +158,21 @@ function App() {
             WebPage <span className='blue-gradient-text'>Summary</span>
           </h2>
           <div className='copy_btn' onClick={() => handleCopy(text)}>
-                <img
-                  src={copied === text ? tick : copy}
-                  alt={copied === text ? "tick" : "copy"}
-                  className='copyElement'
-                />
-              </div>
+            <img
+              src={copied === text ? tick : copy}
+              alt={copied === text ? "tick" : "copy"}
+              className='copyElement'
+            />
+          </div>
         </div>
         <div className='summary-box'>
           <div className='summary-text' dangerouslySetInnerHTML={{ __html: text }} />
 
         </div>
+      </div>
+      <div className="translater-box">
+        <LanguageDropdown selectedLanguage={selectedLanguage} onLanguageChange={handleLanguageChange} />
+        <button className="translate-button" onClick={translateText}>Translate</button>
       </div>
     </div>
   );
